@@ -27,17 +27,17 @@ int numPoints = 0;
 mutex mtx;
 
 // Compute distance^2 between two points
-double squaredDistance(const Point& p1, const Point& p2) {
+double distance(const Point& p1, const Point& p2) {
     double dx = p1.x - p2.x;
     double dy = p1.y - p2.y;
-    return dx * dx + dy * dy;
+    return sqrt(dx * dx + dy * dy);
 }
 
 // Find points within the epsilon neighborhood of a point
-int regionQuery(const Point& point, double EpsSquared, Point* neighbors[], int maxNeighbors) {
+int regionQuery(const Point& point, double Eps, Point* neighbors[], int maxNeighbors) {
     int count = 0;
     for (int i = 0; i < numPoints; ++i) {
-        if (squaredDistance(point, points[i]) <= EpsSquared) {
+        if (distance(point, points[i]) <= Eps) {
             if (count < maxNeighbors) {
                 neighbors[count++] = &points[i];
             }
@@ -47,9 +47,9 @@ int regionQuery(const Point& point, double EpsSquared, Point* neighbors[], int m
 }
 
 // Expand a cluster
-bool expandCluster(Point* point, int c_id, double EpsSquared, int MinPts) {
+bool expandCluster(Point* point, int c_id, double Eps, int MinPts) {
     Point* neighbors[MAX_POINTS];
-    int numNeighbors = regionQuery(*point, EpsSquared, neighbors, MAX_POINTS);
+    int numNeighbors = regionQuery(*point, Eps, neighbors, MAX_POINTS);
     if (numNeighbors < MinPts) {
         point->c_id = NOISE; // can't be point.c_id b/c 'point' is a pointer, not a direct instance
         return false;
@@ -60,7 +60,7 @@ bool expandCluster(Point* point, int c_id, double EpsSquared, int MinPts) {
             if (neighbors[i]->c_id == UNCLASSIFIED || neighbors[i]->c_id == NOISE) {
                 if (neighbors[i]->c_id == UNCLASSIFIED) {
                     Point* newNeighbors[MAX_POINTS];
-                    int numNewNeighbors = regionQuery(*neighbors[i], EpsSquared, newNeighbors, MAX_POINTS);
+                    int numNewNeighbors = regionQuery(*neighbors[i], Eps, newNeighbors, MAX_POINTS);
                     for (int j = 0; j < numNewNeighbors; ++j) {
                         if (newNeighbors[j]->c_id == UNCLASSIFIED) {
                             neighbors[numNeighbors++] = newNeighbors[j];
@@ -77,11 +77,10 @@ bool expandCluster(Point* point, int c_id, double EpsSquared, int MinPts) {
 // Clustering algorithm
 void DBSCAN(double Eps, int MinPts) {
     int ClusterId = 0;
-    double EpsSquared = Eps * Eps;
 
     for (int i = 0; i < numPoints; ++i) {
         if (points[i].c_id == UNCLASSIFIED) {
-            if (expandCluster(&points[i], ClusterId, EpsSquared, MinPts)) {
+            if (expandCluster(&points[i], ClusterId, Eps, MinPts)) {
                 ClusterId++;
             }
         }
