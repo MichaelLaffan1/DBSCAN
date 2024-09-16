@@ -11,7 +11,7 @@
 using namespace std;
 
 const int UNCLASSIFIED = -1;
-const int NOISE = -2;
+const int NOISE = 0;
 const int MAX_POINTS = 1000; // could play around w/ higher numbers of points
 
 class Point {
@@ -22,19 +22,22 @@ public:
 };
 
 // Global variables
-Point points[MAX_POINTS];
 int numPoints = 0;
+Point* points;
 mutex mtx;
 
+
+void formatPoint(Point& point, char* buffer, size_t bufferSize) {
+    snprintf(buffer, bufferSize, "%.1f %.1f %d", point.x, point.y, point.c_id);
+}
+
 // Compute distance^2 between two points
-double distance(const Point& p1, const Point& p2) {
-    double dx = p1.x - p2.x;
-    double dy = p1.y - p2.y;
-    return sqrt(dx * dx + dy * dy);
+double distance(Point& p1, Point& p2) {
+    return sqrt(pow(p2.x - p1.x, 2) + (p2.y - p1.y, 2));
 }
 
 // Find points within the epsilon neighborhood of a point
-int regionQuery(const Point& point, double Eps, Point* neighbors[], int maxNeighbors) {
+int regionQuery(Point& point, double Eps, Point* neighbors[], int maxNeighbors) {
     int count = 0;
     for (int i = 0; i < numPoints; ++i) {
         if (distance(point, points[i]) <= Eps) {
@@ -75,8 +78,8 @@ bool expandCluster(Point* point, int c_id, double Eps, int MinPts) {
 }
 
 // Clustering algorithm
-void DBSCAN(double Eps, int MinPts) {
-    int ClusterId = 0;
+void DBSCAN(double Eps, int MinPts, Point*& points, int numPoints) {
+    int ClusterId = 1;
 
     for (int i = 0; i < numPoints; ++i) {
         if (points[i].c_id == UNCLASSIFIED) {
@@ -87,10 +90,14 @@ void DBSCAN(double Eps, int MinPts) {
     }
 }
 
-void writeToFile(const char* filename, const char* content) {
+void writeToFile(const string& filename) {
+    char buffer[256];
     ofstream file(filename);
     if (file.is_open()) {
-        file << content;
+        for (int i = 0; i < numPoints; i++) {
+            formatPoint(points[i], buffer, sizeof(buffer));
+            file << buffer << endl;
+        }
         file.close();
     }
     else {
@@ -98,63 +105,43 @@ void writeToFile(const char* filename, const char* content) {
     }
 }
 
-void readFromFile(const char* filename) {
-    char buffer[256]; // max length per line
+void readFromFile(const string& filename, Point*& points) {
     ifstream file(filename);
     if (file.is_open()) {
-        while (file.getline(buffer, 256)) {
-            cout << buffer << endl;
+        double x, y;
+        while (file >> x >> y) {
+            numPoints++;
+        }
+        file.clear();
+        file.seekg(0, ios::beg);
+        points = new Point[numPoints];
+
+        int i = 0;
+        while (file.good()) {
+            file >> x >> y;
+            points[i++] = Point(x, y);
         }
         file.close();
     }
     else {
         cerr << "Error opening file for reading: " << filename << endl;
+        exit(1);
     }
-}
-
-void formatPoint(const Point& point, char* buffer, size_t bufferSize) {
-    snprintf(buffer, bufferSize, "%.1f,%.1f,%d", point.x, point.y, point.c_id);
 }
 
 int main()
 {
 
-    /* char* filename = "../testcases/filename.txt";
-    const char* content = "Can I write to a file AND read from it?";
-    writeToFile(filename, content);
-
-    readFromFile(filename);*/
-
-    numPoints = 8;
-    points[0] = Point(1.0, 2.0); // should be in cluster 0
-    points[1] = Point(2.0, 2.0); // 0
-    points[2] = Point(2.0, 3.0); // 0
-    points[3] = Point(8.0, 7.0); // 1
-    points[4] = Point(8.0, 8.0); // 1
-    points[5] = Point(15.0, 50.0); // all alone
-    points[6] = Point(1.0, 35.0); // 2
-    points[7] = Point(2.0, 40.0); // 2
-
-    double eps = 6;
+    string filename = "points.txt";
+    
+    double eps = 0.3;
     int minPts = 2;
 
-    DBSCAN(eps, minPts);
+    readFromFile(filename, points);
 
-    ofstream outFile("../outputs/points.txt");
-    if (!outFile) {
-        cerr << "Error opening file for writing." << endl;
-        return 1;
-    }
-    
-    char buffer[256];
-    // Write points to the file
-    for (int i = 0; i < numPoints; ++i) {
-        formatPoint(points[i], buffer, sizeof(buffer));
-        cout << buffer << endl;
-        outFile << buffer << endl;
-    }
+    DBSCAN(eps, minPts, points, numPoints);
 
-    outFile.close();
+    writeToFile(filename);
 
     return 0;
 }
