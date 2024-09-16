@@ -31,9 +31,12 @@ void formatPoint(Point& point, char* buffer, size_t bufferSize) {
     snprintf(buffer, bufferSize, "%.1f %.1f %d", point.x, point.y, point.c_id);
 }
 
-// Compute distance^2 between two points
+// Compute square root distance between two points
 double distance(Point& p1, Point& p2) {
-    return sqrt(pow(p2.x - p1.x, 2) + (p2.y - p1.y, 2));
+    double dx = p2.x - p1.x;
+    double dy = p2.y - p1.y;
+    double dist = sqrt(pow(dx, 2) + pow(dy, 2));
+    return dist;
 }
 
 // Find points within the epsilon neighborhood of a point
@@ -134,7 +137,7 @@ int main()
 
     string filename = "points.txt";
     
-    double eps = 0.3;
+    double eps = 1.5;
     int minPts = 2;
 
     readFromFile(filename, points);
