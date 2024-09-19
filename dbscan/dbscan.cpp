@@ -88,6 +88,7 @@ bool expandCluster(Point& point, int c_id) {
 }
 
 void writeToFile(const string& filename) {
+    mtx.lock();
     char buffer[256];
     ofstream file(filename);
     if (file.is_open()) {
@@ -100,9 +101,11 @@ void writeToFile(const string& filename) {
     else {
         cerr << "Error opening file for writing: " << filename << endl;
     }
+    mtx.unlock();
 }
 
 void readFromFile(const string& filename) {
+    mtx.lock();
     ifstream file(filename);
     if (file.is_open()) {
         numPoints = 0;
@@ -153,9 +156,11 @@ void readFromFile(const string& filename) {
         cerr << "Error opening file for reading: " << filename << endl;
         exit(1);
     }
+    mtx.unlock();
 }
 
 void DBSCAN() {
+    mtx.lock();
     int ClusterId = 1;
 
     for (int i = 0; i < numPoints; ++i) {
@@ -165,16 +170,21 @@ void DBSCAN() {
             }
         }
     }
+    mtx.unlock();
 }
 
 int main() {
     string filein = "points.txt";
     string outfile = "results.txt";
 
-    readFromFile(filein);
-    DBSCAN();
-    writeToFile(outfile);
+    thread r(readFromFile,filein);
+    thread d(DBSCAN);
+    thread w(writeToFile, outfile);
 
-    delete[] points; // Clean up dynamically allocated memory
+    r.join();
+    d.join();
+    w.join();
+
+    free(points); // Clean up dynamically allocated memory
     return 0;
 }
