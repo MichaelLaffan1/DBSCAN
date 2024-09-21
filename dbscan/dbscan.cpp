@@ -41,7 +41,6 @@ void expandCluster(Point* points, int num_points, int index, int cluster_id, int
 }
 
 void writeToFile(const string& filename, Point* points) {
-    mtx.lock();
     ofstream file(filename);
     if (file.is_open()) {
         for (int i = 0; i < numPoints; i++) {
@@ -52,7 +51,6 @@ void writeToFile(const string& filename, Point* points) {
     else {
         cerr << "Error opening file for writing: " << filename << endl;
     }
-    mtx.unlock();
 }
 
 void readFromFile(const string& filename, Point*& points, int*& visited) {
@@ -89,6 +87,17 @@ void readFromFile(const string& filename, Point*& points, int*& visited) {
             i++;
         }
 
+        for (int i = 0; i < numPoints; i++) {
+            for (int j = 0; j < numPoints; j++) {
+                if (i != j) {
+                    if (points[i].x == points[j].x && points[i].y == points[j].y) {
+                        cerr << "Cannot have duplicate coordinates" << endl;
+                        exit(1);
+                    }
+                }
+            }
+        }
+
         file.close();
     }
     else {
@@ -122,6 +131,17 @@ void dbscan_thread(Point* points, int num_points, int thread_id, int total_threa
     }
 }
 
+int getThreads() {
+    int numThreads;
+    cout << "Enter the number of threads you want to run DBSCAN with: " << endl;
+    cin >> numThreads;
+    if (numThreads <= 0) {
+        cerr << "Invalid number of threads." << endl;
+        exit(1);
+    }
+    return numThreads;
+}
+
 int main() {
     string filein = "points.txt";
     string outfile = "results.txt";
@@ -129,22 +149,25 @@ int main() {
 
     Point* points;
     int* visited;
-    const int numThreads = 10;
+
+    const int numThreads = getThreads();
 
     readFromFile(filein, points, visited);
 
-    thread threads [numThreads];
+    thread* threads = new thread[numThreads];
 
     for (int i = 0; i < numThreads; ++i) {
         threads[i] = thread(dbscan_thread, points, numPoints, i, numThreads, visited, ref(cluster_id));
     }
 
+    
     for (int i = 0; i < numThreads; ++i) {
         threads[i].join();
     }
-
+    
     writeToFile(outfile, points);
 
+    delete[] threads;
     free(points);
     free(visited);
 
