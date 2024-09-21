@@ -1,12 +1,12 @@
 #include <iostream>
 #include <fstream>
 #include <mutex>
+#include <thread>
 
 using namespace std;
 
 const int UNCLASSIFIED = -1;
 const int NOISE = 0;
-const int MAX_POINTS = 1000; // Adjust as needed
 
 class Point {
 public:
@@ -18,83 +18,34 @@ public:
 // Global variables
 int numPoints;
 double eps;
-double minPts;
-Point* points;
+int minPts;
 mutex mtx;
 
-// Compute square root distance between two points
+// Compute Euclidean distance between two points
 double distance(const Point& p1, const Point& p2) {
     double dx = p2.x - p1.x;
     double dy = p2.y - p1.y;
-    return sqrt(dx * dx + dy * dy);
+    return sqrt(pow(dx, 2) + pow(dy, 2));
 }
 
-// Find points within the epsilon neighborhood of a point
-int regionQuery(const Point& point, Point* neighbors[], int maxNeighbors) {
-    int count = 0;
-    for (int i = 0; i < numPoints; ++i) {
-        if (distance(point, points[i]) <= eps) {
-            if (count < maxNeighbors) {
-                neighbors[count++] = &points[i];
-            }
+// Expand cluster by finding density-connected points
+void expandCluster(Point* points, int num_points, int index, int cluster_id, int* visited) {
+    points[index].c_id = cluster_id;
+    for (int i = 0; i < num_points; ++i) {
+        if (visited[i] == 0 && distance(points[index], points[i]) <= eps) {
+            visited[i] = 1;
+            points[i].c_id = cluster_id;
+            expandCluster(points, num_points, i, cluster_id, visited); 
         }
-    }
-    return count;
-}
-
-// Expand a cluster
-bool expandCluster(Point& point, int c_id) {
-    Point* seeds[MAX_POINTS];
-    int numSeeds = regionQuery(point, seeds, MAX_POINTS);
-
-    if (numSeeds < minPts) {
-        point.c_id = NOISE;
-        return false;
-    }
-    else {
-        point.c_id = c_id;
-        int seedsCount = numSeeds;
-
-        for (int i = 0; i < numSeeds; ++i) {
-            seeds[i]->c_id = c_id;
-        }
-
-        int index = 0;
-        while (index < seedsCount) {
-            Point* currentP = seeds[index];
-            index++;
-
-            Point* result[MAX_POINTS];
-            int numResultNeighbors = regionQuery(*currentP, result, MAX_POINTS);
-            if (numResultNeighbors >= minPts) {
-                for (int j = 0; j < numResultNeighbors; ++j) {
-                    Point* resultP = result[j];
-                    if (resultP->c_id == UNCLASSIFIED || resultP->c_id == NOISE) {
-                        if (resultP->c_id == UNCLASSIFIED) {
-                            if (seedsCount < MAX_POINTS) {
-                                seeds[seedsCount++] = resultP;
-                            }
-                            else {
-                                cerr << "Warning: Seeds array full!" << endl;
-                            }
-                        }
-                        resultP->c_id = c_id;
-                    }
-                }
-            }
-        }
-        return true;
     }
 }
 
-void writeToFile(const string& filename) {
+void writeToFile(const string& filename, Point* points) {
     mtx.lock();
-    char buffer[256];
     ofstream file(filename);
     if (file.is_open()) {
         for (int i = 0; i < numPoints; i++) {
-            snprintf(buffer, sizeof(buffer), "%.1f %.1f %d", points[i].x, points[i].y, points[i].c_id);
-            file << buffer << endl;
+            file << points[i].x << " " << points[i].y << " " << points[i].c_id << endl;
         }
         file.close();
     }
@@ -104,19 +55,13 @@ void writeToFile(const string& filename) {
     mtx.unlock();
 }
 
-void readFromFile(const string& filename) {
-    mtx.lock();
+void readFromFile(const string& filename, Point*& points, int*& visited) {
     ifstream file(filename);
     if (file.is_open()) {
-        numPoints = 0;
         file >> eps >> minPts;
 
         if (minPts <= 0) {
             cerr << "Minimum points should be greater than 0" << endl;
-            exit(1);
-        }
-        if (int(minPts) != minPts) {
-            cerr << "Minimum points should be an integer" << endl;
             exit(1);
         }
         if (eps < 0) {
@@ -124,8 +69,8 @@ void readFromFile(const string& filename) {
             exit(1);
         }
 
-
         double x, y;
+        numPoints = 0;
         while (file >> x >> y) {
             numPoints++;
         }
@@ -133,58 +78,75 @@ void readFromFile(const string& filename) {
         file.seekg(0, ios::beg);
 
         file >> eps >> minPts;
+
         points = new Point[numPoints];
+        visited = (int*)malloc(numPoints * sizeof(int));
 
         int i = 0;
         while (file >> x >> y) {
-            points[i++] = Point(x, y);
+            points[i] = Point(x, y);
+            visited[i] = 0;
+            i++;
         }
 
-        for (int i = 0; i < numPoints; i++) {
-            for (int j = 0; j < numPoints; j++) {
-                if (i != j) {
-                    if (points[i].x == points[j].x && points[i].y == points[j].y) {
-                        cerr << "Cannot have duplicate coordinates" << endl;
-                        exit(1);
-                    }
-                }
-            }
-        }
         file.close();
     }
     else {
         cerr << "Error opening file for reading: " << filename << endl;
         exit(1);
     }
-    mtx.unlock();
 }
 
-void DBSCAN() {
-    mtx.lock();
-    int ClusterId = 1;
+void dbscan_thread(Point* points, int num_points, int thread_id, int total_threads, int* visited, int& cluster_id) {
+    int start = thread_id * (num_points / total_threads);
+    int end = (thread_id == total_threads - 1) ? num_points : (thread_id + 1) * (num_points / total_threads);
 
-    for (int i = 0; i < numPoints; ++i) {
+    for (int i = start; i < end; ++i) {
         if (points[i].c_id == UNCLASSIFIED) {
-            if (expandCluster(points[i], ClusterId)) {
-                ClusterId++;
+            int neighbor_count = 0;
+            for (int j = 0; j < num_points; ++j) {
+                if (distance(points[i], points[j]) <= eps) {
+                    neighbor_count++;
+                }
+            }
+            if (neighbor_count >= minPts) {
+                mtx.lock();
+                cluster_id++;
+                mtx.unlock();
+                expandCluster(points, num_points, i, cluster_id, visited);
+            }
+            else {
+                points[i].c_id = NOISE; // Noise point
             }
         }
     }
-    mtx.unlock();
 }
 
 int main() {
     string filein = "points.txt";
     string outfile = "results.txt";
+    int cluster_id = 0;
 
-    thread r(readFromFile,filein);
-    thread d(DBSCAN);
-    thread w(writeToFile, outfile);
+    Point* points;
+    int* visited;
+    const int numThreads = 10;
 
-    r.join();
-    d.join();
-    w.join();
+    readFromFile(filein, points, visited);
 
-    free(points); // Clean up dynamically allocated memory
+    thread threads [numThreads];
+
+    for (int i = 0; i < numThreads; ++i) {
+        threads[i] = thread(dbscan_thread, points, numPoints, i, numThreads, visited, ref(cluster_id));
+    }
+
+    for (int i = 0; i < numThreads; ++i) {
+        threads[i].join();
+    }
+
+    writeToFile(outfile, points);
+
+    free(points);
+    free(visited);
+
     return 0;
 }
