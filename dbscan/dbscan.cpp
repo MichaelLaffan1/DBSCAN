@@ -20,6 +20,7 @@ int numPoints;
 double eps;
 int minPts;
 mutex mtx;
+unsigned int maxCores = thread::hardware_concurrency(); // returns the number of concurrent threads supported by the hardware implementation
 
 // Compute Euclidean distance between two points
 double distance(const Point& p1, const Point& p2) {
@@ -131,13 +132,41 @@ void dbscan_thread(Point* points, int num_points, int thread_id, int total_threa
     }
 }
 
+bool getYesNo(string& prompt) {
+    string input;
+    while (true) {
+        cout << prompt << " (yes/no): ";
+        cin >> input;
+
+        for (auto& c : input)
+            c = tolower(c); // Convert to lowercase for easier comparison
+
+        if (input == "yes" or input == "y")
+            return true;
+        else if (input == "no" or input == "n")
+            return false;
+        else
+            std::cout << "Invalid input. Please enter 'yes' or 'no'." << std::endl;
+    }
+}
+
 int getThreads() {
-    int numThreads;
-    cout << "Enter the number of threads you want to run DBSCAN with: " << endl;
-    cin >> numThreads;
-    if (numThreads <= 0) {
-        cerr << "Invalid number of threads." << endl;
-        exit(1);
+    int numThreads = -1;
+    cout << "Enter the number of threads you want to run DBSCAN with. The maximum for your system is: " << maxCores << endl;
+    while (numThreads == -1) {
+        cin >> numThreads;
+        if (numThreads <= 0) {
+            cout << "Invalid number of threads. Please use a positive integer" << endl;
+        }
+        else if (numThreads > maxCores) {
+            string prompt = "Are you sure? There will be more threads than cores...";
+            bool answer = getYesNo(prompt);
+            if (answer)
+                return numThreads;
+            else
+                cout << "Using max number of cores instead, " << maxCores << endl;
+                numThreads = maxCores;
+        }
     }
     return numThreads;
 }
@@ -150,9 +179,9 @@ int main() {
     Point* points;
     int* visited;
 
-    const int numThreads = getThreads();
-
     readFromFile(filein, points, visited);
+
+    const int numThreads = getThreads();
 
     thread* threads = new thread[numThreads];
 
