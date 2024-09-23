@@ -172,16 +172,19 @@ int getThreads() {
 }
 
 int main() {
-    string filein = "points.txt";
+    //string filein = "points.txt";
+    string filein = "../testcase_20k.txt";
     string outfile = "results.txt";
     int cluster_id = 0;
 
     Point* points;
     int* visited;
 
+    const int numThreads = getThreads();
+
     readFromFile(filein, points, visited);
 
-    const int numThreads = getThreads();
+    // put first breakpoint here
 
     thread* threads = new thread[numThreads];
 
@@ -199,6 +202,8 @@ int main() {
     delete[] threads;
     free(points);
     free(visited);
+
+    // put second breakpoint here
 
     return 0;
 }
