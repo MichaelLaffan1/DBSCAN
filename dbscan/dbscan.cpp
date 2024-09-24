@@ -12,7 +12,8 @@ class Point {
 public:
     double x, y;
     int c_id;
-    Point(double x = 0, double y = 0) : x(x), y(y), c_id(UNCLASSIFIED) {}
+    int t_id;
+    Point(double x = 0, double y = 0) : x(x), y(y), c_id(UNCLASSIFIED), t_id(t_id) {}
 };
 
 // Global variables
@@ -30,13 +31,15 @@ double distance(const Point& p1, const Point& p2) {
 }
 
 // Expand cluster by finding density-connected points
-void expandCluster(Point* points, int num_points, int index, int cluster_id, int* visited) {
+void expandCluster(Point* points, int num_points, int index, int cluster_id, int* visited, int thread_id) {
     points[index].c_id = cluster_id;
+    points[index].t_id = thread_id;
     for (int i = 0; i < num_points; ++i) {
         if (visited[i] == 0 && distance(points[index], points[i]) <= eps) {
             visited[i] = 1;
             points[i].c_id = cluster_id;
-            expandCluster(points, num_points, i, cluster_id, visited); 
+            points[i].t_id = thread_id;
+            expandCluster(points, num_points, i, cluster_id, visited, thread_id);
         }
     }
 }
@@ -45,7 +48,7 @@ void writeToFile(const string& filename, Point* points) {
     ofstream file(filename);
     if (file.is_open()) {
         for (int i = 0; i < numPoints; i++) {
-            file << points[i].x << " " << points[i].y << " " << points[i].c_id << endl;
+            file << points[i].x << " " << points[i].y << " " << points[i].c_id << " " << points[i].t_id << endl;
         }
         file.close();
     }
@@ -123,7 +126,7 @@ void dbscan_thread(Point* points, int num_points, int thread_id, int total_threa
                 mtx.lock();
                 cluster_id++;
                 mtx.unlock();
-                expandCluster(points, num_points, i, cluster_id, visited);
+                expandCluster(points, num_points, i, cluster_id, visited, thread_id);
             }
             else {
                 points[i].c_id = NOISE; // Noise point
@@ -172,8 +175,8 @@ int getThreads() {
 }
 
 int main() {
-    //string filein = "points.txt";
-    string filein = "../testcase_20k.txt";
+    string filein = "points.txt";
+    //string filein = "../testcase_20k.txt";
     string outfile = "results.txt";
     int cluster_id = 0;
 
