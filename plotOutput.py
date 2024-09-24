@@ -3,7 +3,27 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 df = pd.read_csv("dbscan/results.txt", header=None, delim_whitespace=True)
-df.columns = ['x', 'y', 'cluster_id']
-sns.set_style('darkgrid')
-sns.scatterplot(data=df, x='x', y='y', hue='cluster_id', palette='tab10', marker='o')
-plt.show()
+try:
+    df.columns = ['x', 'y', 'cluster_id', 'thread_id']
+    sns.set_style('darkgrid')
+    fig, axes = plt.subplots(1, 2, figsize=(14, 6))
+
+    sns.scatterplot(data=df, x='x', y='y', hue='cluster_id', palette='tab10', marker='o', ax=axes[0])
+    axes[0].set_title('Scatterplot by Cluster ID')
+
+    sns.scatterplot(data=df, x='x', y='y', hue='thread_id', palette='tab10', marker='o', ax=axes[1])
+    axes[1].set_title('Scatterplot by Thread ID')
+
+    plt.tight_layout()
+    plt.show()
+
+except:
+    df.columns = ['x', 'y', 'cluster_id']
+    sns.set_style('darkgrid')
+    fig, axes = plt.subplots(1, 2, figsize=(14, 6))
+
+    sns.scatterplot(data=df, x='x', y='y', hue='cluster_id', palette='tab10', marker='o', ax=axes[0])
+    axes[0].set_title('Scatterplot by Cluster ID')
+
+    plt.tight_layout()
+    plt.show()
