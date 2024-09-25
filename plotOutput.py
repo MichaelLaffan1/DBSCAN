@@ -16,7 +16,10 @@ try:
 
     num_unique_clusters = value_counts.shape[0]
 
-    non_zero_clusters = value_counts.drop(0)  # exclude cluster 0
+    try:
+        non_zero_clusters = value_counts.drop(0)  # exclude cluster 0
+    except:
+        non_zero_clusters = value_counts
     cluster_with_max_count = non_zero_clusters.idxmax()  # cluster_id w/ the highest count
     max_count = non_zero_clusters.max()  # count of the cluster w/ max count
 
