@@ -4,6 +4,7 @@
 #include <thread>
 
 using namespace std;
+using namespace chrono;
 
 const int UNCLASSIFIED = -1;
 const int NOISE = 0;
@@ -30,19 +31,34 @@ double distance(const Point& p1, const Point& p2) {
     return sqrt(pow(dx, 2) + pow(dy, 2));
 }
 
-// Expand cluster by finding density-connected points
 void expandCluster(Point* points, int num_points, int index, int cluster_id, int* visited, int thread_id) {
+    // Simulate a stack using a dynamic array
+    int* neighbors = (int*)malloc(num_points * sizeof(int));
+    int top = -1;
+
+    // Start with the initial point
+    neighbors[++top] = index;
+
     points[index].c_id = cluster_id;
     points[index].t_id = thread_id;
-    for (int i = 0; i < num_points; ++i) {
-        if (visited[i] == 0 && distance(points[index], points[i]) <= eps) {
-            visited[i] = 1;
-            points[i].c_id = cluster_id;
-            points[i].t_id = thread_id;
-            expandCluster(points, num_points, i, cluster_id, visited, thread_id);
+
+    while (top >= 0) {
+        int current = neighbors[top--]; // Pop from the stack
+
+        for (int i = 0; i < num_points; ++i) {
+            if (visited[i] == 0 && distance(points[current], points[i]) <= eps) {
+                visited[i] = 1;
+                points[i].c_id = cluster_id;
+                points[i].t_id = thread_id;
+                neighbors[++top] = i;  // Push to the stack
+            }
         }
     }
+
+    // Free the allocated memory for the "stack"
+    free(neighbors);
 }
+
 
 void writeToFile(const string& filename, Point* points) {
     ofstream file(filename);
@@ -175,8 +191,8 @@ int getThreads() {
 }
 
 int main() {
-    string filein = "points.txt";
-    //string filein = "../testcase_20k.txt";
+    //string filein = "points.txt";
+    string filein = "../testcase_100k.txt";
     string outfile = "results.txt";
     int cluster_id = 0;
 
@@ -184,6 +200,8 @@ int main() {
     int* visited;
 
     const int numThreads = getThreads();
+
+    auto start = high_resolution_clock::now();
 
     readFromFile(filein, points, visited);
 
@@ -205,6 +223,12 @@ int main() {
     delete[] threads;
     free(points);
     free(visited);
+
+    auto stop = high_resolution_clock::now();
+
+    auto duration = duration_cast<milliseconds>(stop - start);
+
+    cout << "Runtime: " << duration.count() << " milliseconds." << endl;
 
     // put second breakpoint here
 
