@@ -11,7 +11,10 @@ try:
     sns.scatterplot(data=df, x='x', y='y', hue='cluster_id', palette='tab10', marker='o', ax=axes[0])
     axes[0].set_title('Scatterplot by Cluster ID')
 
-    print((df['cluster_id'] == 0).sum())
+    value_counts = df['cluster_id'].value_counts()
+
+    for value, count in value_counts.items():
+        print(f"Cluster: {value}, Count: {count}")
 
     sns.scatterplot(data=df, x='x', y='y', hue='thread_id', palette='tab10', marker='o', ax=axes[1])
     axes[1].set_title('Scatterplot by Thread ID')
