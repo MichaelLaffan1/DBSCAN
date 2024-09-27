@@ -31,6 +31,7 @@ double distance(const Point& p1, const Point& p2) {
     return sqrt(pow(dx, 2) + pow(dy, 2));
 }
 
+//expands a cluster
 void expandCluster(Point* points, int num_points, int index, int cluster_id, int* visited, int thread_id) {
     // Simulate a stack using a dynamic array
     int* neighbors = (int*)malloc(num_points * sizeof(int));
@@ -60,6 +61,7 @@ void expandCluster(Point* points, int num_points, int index, int cluster_id, int
 }
 
 
+//writes results to results file
 void writeToFile(const string& filename, Point* points) {
     ofstream file(filename);
     if (file.is_open()) {
@@ -73,6 +75,7 @@ void writeToFile(const string& filename, Point* points) {
     }
 }
 
+//reads input from file
 void readFromFile(const string& filename, Point*& points, int*& visited) {
     ifstream file(filename);
     if (file.is_open()) {
@@ -126,6 +129,7 @@ void readFromFile(const string& filename, Point*& points, int*& visited) {
     }
 }
 
+//performs dbscan and distributes work for each thread
 void dbscan_thread(Point* points, int num_points, int thread_id, int total_threads, int* visited, int& cluster_id) {
     int start = thread_id * (num_points / total_threads);
     int end = (thread_id == total_threads - 1) ? num_points : (thread_id + 1) * (num_points / total_threads);
@@ -151,6 +155,7 @@ void dbscan_thread(Point* points, int num_points, int thread_id, int total_threa
     }
 }
 
+//prompt for selecting yes or no
 bool getYesNo(string& prompt) {
     string input;
     while (true) {
@@ -169,6 +174,7 @@ bool getYesNo(string& prompt) {
     }
 }
 
+//gets number of threads from user
 int getThreads() {
     int numThreads = -1;
     cout << "Enter the number of threads you want to run DBSCAN with. The maximum for your system is: " << maxCores << endl;
@@ -190,9 +196,9 @@ int getThreads() {
     return numThreads;
 }
 
+//main method
 int main() {
-    //string filein = "points.txt";
-    string filein = "../testcase_100k.txt";
+    string filein = "points.txt";
     string outfile = "results.txt";
     int cluster_id = 0;
 
@@ -204,8 +210,6 @@ int main() {
     auto start = high_resolution_clock::now();
 
     readFromFile(filein, points, visited);
-
-    // put first breakpoint here
 
     thread* threads = new thread[numThreads];
 
@@ -229,8 +233,6 @@ int main() {
     auto duration = duration_cast<milliseconds>(stop - start);
 
     cout << "Runtime: " << duration.count() << " milliseconds." << endl;
-
-    // put second breakpoint here
 
     return 0;
 }
